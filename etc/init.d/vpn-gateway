@@ -84,7 +84,6 @@ log file /var/log/quagga/bgpd.log
 debug bgp events
 debug bgp zebra
 debug bgp updates
-include "/etc/quagga/peers.d/*.conf"
 !
 line vty
 EOF
