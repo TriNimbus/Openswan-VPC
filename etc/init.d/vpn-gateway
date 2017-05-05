@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ### BEGIN INIT INFO
-# Provides:          VPN Gateway to AWS VPC 
+# Provides:          VPN Gateway to AWS VPC
 # Required-Start:    $network $remote_fs $syslog
 # Required-Stop:     $syslog $remote_fs
 # Default-Start:     2 3 4 5
@@ -45,8 +45,6 @@ setup_environment() {
   INSTANCE_IP=`$curl -s $instance_metadata_url/local-ipv4`
   QUAGGA_PASSWORD=testPassword
   GATEWAY_IP=169.254.240.1
-  NAMESPACE_TUNNEL1_IP=169.254.0.2
-  NAMESPACE_TUNNEL2_IP=169.254.0.3
 
   #Create a network namespace
   ip netns add openswan
@@ -121,8 +119,8 @@ start_control_plane() {
 
 stop_control_plane() {
   $ox /etc/init.d/bgpd stop
-  $ox /etc/init.d/zebra stop 
-  $ox /etc/init.d/ipsec stop 
+  $ox /etc/init.d/zebra stop
+  $ox /etc/init.d/ipsec stop
 }
 
 delete_files() {
@@ -138,7 +136,7 @@ start() {
     (
     setup_environment
     start_control_plane
-    RETVAL=$? 
+    RETVAL=$?
     ) 2>&1 | $logger
     return $RETVAL
 }
@@ -150,7 +148,7 @@ stop() {
     stop_control_plane
     teardown_network
     delete_files
-    RETVAL=$? 
+    RETVAL=$?
     ) 2>&1 | $logger
     return $RETVAL
 }
@@ -170,10 +168,10 @@ case "$1" in
          ;;
     restart|--restart)
          restart
- 	 ;;
+   ;;
     *)
          echo "Usage: $prog {start|stop|restart}"
          RETVAL=2
 esac
- 	
+
 exit $RETVAL

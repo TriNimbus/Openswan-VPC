@@ -1,9 +1,5 @@
 #!/bin/bash +x
-
 source conf.sh
-
-QUAGGA_PASSWORD="testpassword123"
-HOSTNAME=`hostname`
 
 curl="curl --retry 3 --silent --show-error --fail"
 instance_metadata_url=http://169.254.169.254/latest/meta-data
@@ -82,16 +78,16 @@ EOF
   chmod 644 /etc/ipsec.d/${VPNID}-2.secrets
 
     #Setup BGP
-  cat <<EOF >> /etc/quagga/bgpd.conf
+  cat <<EOF > /etc/quagga/peers.d/${VPNID}.conf
 router bgp $CUSTOMER_ASN
     neighbor $VGW_TUNNEL1_INSIDE_IP remote-as $AWS_ASN
     neighbor $VGW_TUNNEL1_INSIDE_IP description ${VPNID}-1
-    neighbor $VGW_TUNNEL2_INSIDE_IP remote-as $AWS_ASN 
+    neighbor $VGW_TUNNEL2_INSIDE_IP remote-as $AWS_ASN
     neighbor $VGW_TUNNEL2_INSIDE_IP description ${VPNID}-2
 EOF
 
-  $ox ip addr add dev eth0 $NAMESPACE_TUNNEL1_IP/28
-  $ox ip addr add dev eth0 $NAMESPACE_TUNNEL2_IP/28
+  $ox ip addr add dev eth0 $NAMESPACE_TUNNEL1_IP/20
+  $ox ip addr add dev eth0 $NAMESPACE_TUNNEL2_IP/20
   $ox ip addr add dev eth0 $CGW_TUNNEL1_INSIDE_IP/30
   $ox ip addr add dev eth0 $CGW_TUNNEL2_INSIDE_IP/30
 
@@ -99,9 +95,9 @@ EOF
   iptables -t nat -D PREROUTING -s $VGW_TUNNEL1_OUTSIDE_IP/32 -i eth0 -j DNAT --to-destination $NAMESPACE_TUNNEL1_IP
   iptables -t nat -A PREROUTING -s $VGW_TUNNEL1_OUTSIDE_IP/32 -i eth0 -j DNAT --to-destination $NAMESPACE_TUNNEL1_IP
   iptables -t nat -D POSTROUTING -d $VGW_TUNNEL1_OUTSIDE_IP/32 -j SNAT --to-source $INSTANCE_IP
-  iptables -t nat -A POSTROUTING -d $VGW_TUNNEL1_OUTSIDE_IP/32 -j SNAT --to-source $INSTANCE_IP 
+  iptables -t nat -A POSTROUTING -d $VGW_TUNNEL1_OUTSIDE_IP/32 -j SNAT --to-source $INSTANCE_IP
 
   iptables -t nat -D PREROUTING -s $VGW_TUNNEL2_OUTSIDE_IP/32 -i eth0 -j DNAT --to-destination $NAMESPACE_TUNNEL2_IP
   iptables -t nat -A PREROUTING -s $VGW_TUNNEL2_OUTSIDE_IP/32 -i eth0 -j DNAT --to-destination $NAMESPACE_TUNNEL2_IP
   iptables -t nat -D POSTROUTING -d $VGW_TUNNEL2_OUTSIDE_IP/32 -j SNAT --to-source $INSTANCE_IP
-  iptables -t nat -A POSTROUTING -d $VGW_TUNNEL2_OUTSIDE_IP/32 -j SNAT --to-source $INSTANCE_IP 
+  iptables -t nat -A POSTROUTING -d $VGW_TUNNEL2_OUTSIDE_IP/32 -j SNAT --to-source $INSTANCE_IP

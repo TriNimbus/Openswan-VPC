@@ -1,0 +1,14 @@
+ip netns exec openswan ip addr add dev eth0 {{vpnconnection.namespace_tunnel1_ip}}/20
+ip netns exec openswan ip addr add dev eth0 {{vpnconnection.namespace_tunnel2_ip}}/20
+ip netns exec openswan ip addr add dev eth0 {{vpnconnection.cgw_tunnel1_inside_ip}}/30
+ip netns exec openswan ip addr add dev eth0 {{vpnconnection.cgw_tunnel2_inside_ip}}/30
+
+
+iptables -t nat -D PREROUTING -s $VGW_TUNNEL1_OUTSIDE_IP/32 -i eth0 -j DNAT --to-destination $NAMESPACE_TUNNEL1_IP
+iptables -t nat -A PREROUTING -s $VGW_TUNNEL1_OUTSIDE_IP/32 -i eth0 -j DNAT --to-destination $NAMESPACE_TUNNEL1_IP
+iptables -t nat -D POSTROUTING -d $VGW_TUNNEL1_OUTSIDE_IP/32 -j SNAT --to-source $INSTANCE_IP
+iptables -t nat -A POSTROUTING -d $VGW_TUNNEL1_OUTSIDE_IP/32 -j SNAT --to-source $INSTANCE_IP
+iptables -t nat -D PREROUTING -s $VGW_TUNNEL2_OUTSIDE_IP/32 -i eth0 -j DNAT --to-destination $NAMESPACE_TUNNEL2_IP
+iptables -t nat -A PREROUTING -s $VGW_TUNNEL2_OUTSIDE_IP/32 -i eth0 -j DNAT --to-destination $NAMESPACE_TUNNEL2_IP
+iptables -t nat -D POSTROUTING -d $VGW_TUNNEL2_OUTSIDE_IP/32 -j SNAT --to-source $INSTANCE_IP
+iptables -t nat -A POSTROUTING -d $VGW_TUNNEL2_OUTSIDE_IP/32 -j SNAT --to-source $INSTANCE_IP

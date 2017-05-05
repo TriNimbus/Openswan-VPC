@@ -1,0 +1,5 @@
+router bgp {{bgp.asn}}
+    neighbor {{vpnconnection.tunnel1_inside_address}} remote-as {{bgp.aws_asn}}
+    neighbor {{vpnconnection.tunnel1_inside_address}} description {{vpnconnection.vpn_id}}-1
+    neighbor {{vpnconnection.tunnel2_inside_address}} remote-as {{bgp.aws_asn}}
+    neighbor {{vpnconnection.tunnel2_inside_address}} description {{vpnconnection.vpn_id}}-1

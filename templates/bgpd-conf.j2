@@ -1,0 +1,10 @@
+hostname {{hostname}}
+password {{quagga_password}}
+enable password {{quagga_password}}
+!
+log file /var/log/quagga/bgpd.log
+debug bgp events
+debug bgp zebra
+debug bgp updates
+!
+line vty
