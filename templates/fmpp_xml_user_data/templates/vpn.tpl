@@ -1,0 +1,11 @@
+CGW_OUTSIDE_IP=${vpn_data.vpn_connection.ipsec_tunnel[0].customer_gateway.tunnel_outside_address.ip_address}
+AWS_ASN=${vpn_data.vpn_connection.ipsec_tunnel[0].vpn_gateway.bgp.asn}
+CUSTOMER_ASN=${vpn_data.vpn_connection.ipsec_tunnel[0].customer_gateway.bgp.asn}
+VGW_TUNNEL1_OUTSIDE_IP=${vpn_data.vpn_connection.ipsec_tunnel[0].vpn_gateway.tunnel_outside_address.ip_address}
+CGW_TUNNEL1_INSIDE_IP=${vpn_data.vpn_connection.ipsec_tunnel[0].customer_gateway.tunnel_inside_address.ip_address}
+VGW_TUNNEL1_INSIDE_IP=${vpn_data.vpn_connection.ipsec_tunnel[0].vpn_gateway.tunnel_inside_address.ip_address}
+TUNNEL1_SECRET=${vpn_data.vpn_connection.ipsec_tunnel[0].ike.pre_shared_key}
+VGW_TUNNEL2_OUTSIDE_IP=${vpn_data.vpn_connection.ipsec_tunnel[1].vpn_gateway.tunnel_outside_address.ip_address}
+CGW_TUNNEL2_INSIDE_IP=${vpn_data.vpn_connection.ipsec_tunnel[1].customer_gateway.tunnel_inside_address.ip_address}
+VGW_TUNNEL2_INSIDE_IP=${vpn_data.vpn_connection.ipsec_tunnel[1].vpn_gateway.tunnel_inside_address.ip_address}
+TUNNEL2_SECRET=${vpn_data.vpn_connection.ipsec_tunnel[1].ike.pre_shared_key}
