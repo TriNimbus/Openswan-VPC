@@ -1,44 +1,4 @@
 #!/bin/bash
-# This script will startup a VPN connection to an AWS VPC. It usese the Openswan package running on an EC2 instance.
-# 1. Start an Amazon Linux instance using the EC2 console and run the following yum commands
-#  $ sudo yum install openswan quagga
-#  $ sudo yum erase ipsec-tools
-# 
-# 2. copy this script to /etc/init.d/vpn-gateway and run this command to start on boot
-#  $ chkconfig --add vpn-gateway
-
-# 3. Make sure the inbound rules are configured in your EC2 security group
-#   UDP port 500 allow
-#   TCP port 179 allow 
-
-# 4. Create an Elastic IP and attach it to the EC2 instance using the EC Console
-# 
-# 5. Create a VPC, a VGW, a CGW (use the Elastic IP from the last step as IP address), and a VPN using the VPC Console
-
-# 6. Stop the EC2 instance and configure the following User Data (click on Instance Actions > View/Change User Data). Get the values from the VPN Download Configuration feature on the VPC Console.
-#  CGW_OUTSIDE_IP=54.200.28.117
-#  CUSTOMER_ASN=65000
-#  AWS_ASN=17493
-#  VGW_TUNNEL1_OUTSIDE_IP=203.83.222.236
-#  CGW_TUNNEL1_INSIDE_IP=169.254.251.26
-#  VGW_TUNNEL1_INSIDE_IP=169.254.251.25
-#  TUNNEL1_SECRET="secret key"
-#  VGW_TUNNEL2_OUTSIDE_IP=203.83.222.237
-#  CGW_TUNNEL2_INSIDE_IP=169.254.251.30
-#  VGW_TUNNEL2_INSIDE_IP=169.254.251.29
-#  TUNNEL2_SECRET="secret key"
-#
-# 7. Reboot the instance and test the configuration by launching a Linux instance in your VPC and pinging that instance
-#  $ ip netns exec openswan ping <IP address in your VPC>
-#
-# 8. If you need to troubleshoot the connectivity, the following commands are useful.
-## Check the IPSEC SA
-#  $ ip netns exec openswan ip xfrm state
-# 
-## Check the BGP Neighbor (use testPassword as the password)
-#  $ ip netns exec openswan telnet 127.0.0.1 2605
-#  > show ip bgp summary
-
 
 ### BEGIN INIT INFO
 # Provides:          VPN Gateway to AWS VPC 
@@ -84,122 +44,26 @@ setup_environment() {
 
   INSTANCE_IP=`$curl -s $instance_metadata_url/local-ipv4`
   QUAGGA_PASSWORD=testPassword
-  GATEWAY_IP=169.254.255.1
-  NAMESPACE_TUNNEL1_IP=169.254.255.2
-  NAMESPACE_TUNNEL2_IP=169.254.255.3
-}
+  GATEWAY_IP=169.254.240.1
+  NAMESPACE_TUNNEL1_IP=169.254.0.2
+  NAMESPACE_TUNNEL2_IP=169.254.0.3
 
-create_files() {
-  #create ipsec config files
-  cat <<EOF > /etc/ipsec.conf
-# /etc/ipsec.conf - Openswan IPsec configuration file
-#
-# Manual:     ipsec.conf.5
-#
-# Please place your own config files in /etc/ipsec.d/ ending in .conf
+  #Create a network namespace
+  ip netns add openswan
 
-version 2.0     # conforms to second version of ipsec.conf specification
+  #Setup Basic Network requirements
+  ip link add type veth
+  ip link set dev veth1 netns openswan
+  ip link set dev veth0 name toopenswan
+  ip addr add dev toopenswan $GATEWAY_IP/20
+  $ox ip link set dev veth1 name eth0
+  ip link set toopenswan up
+  $ox ip link set eth0 up
+  $ox ip link set lo up
+  $ox ip r add default via $GATEWAY_IP
+  sysctl -w net.ipv4.conf.all.forwarding=1
 
-# basic configuration
-config setup
-        protostack=netkey
-        nat_traversal=no
-        virtual_private=
-        oe=off
-
-include /etc/ipsec.d/*.conf
-EOF
-
-  chmod 600 /etc/ipsec.conf
-
-  cat <<EOF > /etc/ipsec.d/aws.conf
-conn awstunnel1
-        authby=secret
-        auto=start
-        left=$NAMESPACE_TUNNEL1_IP
-        leftid=$NAMESPACE_TUNNEL1_IP
-        right=$VGW_TUNNEL1_OUTSIDE_IP
-        rightid=$VGW_TUNNEL1_OUTSIDE_IP
-        type=tunnel
-        ikelifetime=8h
-        keylife=1h
-        phase2alg=aes128-sha1;modp1024
-        ike=aes128-sha1
-        auth=esp
-        keyingtries=%forever
-        aggrmode=no
-        keyexchange=ike
-        ikev2=never
-        leftsubnet=$VGW_TUNNEL1_INSIDE_IP/30
-        rightsubnet=0.0.0.0/0
-        dpddelay=10
-        dpdtimeout=30
-        dpdaction=restart_by_peer
-
-conn awstunnel2
-        authby=secret
-        auto=start
-        left=$NAMESPACE_TUNNEL2_IP
-        leftid=$NAMESPACE_TUNNEL2_IP
-        right=$VGW_TUNNEL2_OUTSIDE_IP
-        rightid=$VGW_TUNNEL2_OUTSIDE_IP
-        type=tunnel
-        ikelifetime=8h
-        keylife=1h
-        phase2alg=aes128-sha1;modp1024
-        ike=aes128-sha1
-        auth=esp
-        keyingtries=%forever
-        aggrmode=no
-        keyexchange=ike
-        ikev2=never
-        leftsubnet=$VGW_TUNNEL2_INSIDE_IP/30
-        rightsubnet=0.0.0.0/0
-        dpddelay=10
-        dpdtimeout=30
-        dpdaction=restart_by_peer
-EOF
-
-  chmod 644 /etc/ipsec.d/aws.conf
-
-
-  cat <<EOF > /etc/ipsec.d/awstunnel1.secrets
-$NAMESPACE_TUNNEL1_IP $VGW_TUNNEL1_OUTSIDE_IP: PSK "$TUNNEL1_SECRET"
-EOF
-
-  chmod 644 /etc/ipsec.d/awstunnel1.secrets
-
-  cat <<EOF > /etc/ipsec.d/awstunnel2.secrets
-$NAMESPACE_TUNNEL2_IP $VGW_TUNNEL2_OUTSIDE_IP: PSK "$TUNNEL2_SECRET"
-EOF
-
-  chmod 644 /etc/ipsec.d/awstunnel2.secrets
-
-  #Setup BGP
-  cat <<EOF > /etc/quagga/bgpd.conf
-hostname $HOSTNAME
-password $QUAGGA_PASSWORD
-enable password $QUAGGA_PASSWORD
-!
-log file /var/log/quagga/bgpd.log
-debug bgp events
-debug bgp zebra
-debug bgp updates
-!
-router bgp $CUSTOMER_ASN
-    bgp router-id $CGW_OUTSIDE_IP
-    network $CGW_TUNNEL1_INSIDE_IP/30
-    network $CGW_TUNNEL2_INSIDE_IP/30
-    network 0.0.0.0/0
-    neighbor $VGW_TUNNEL1_INSIDE_IP remote-as $AWS_ASN 
-    neighbor $VGW_TUNNEL2_INSIDE_IP remote-as $AWS_ASN 
-line vty
-EOF
-
-  chmod 640 /etc/quagga/bgpd.conf
-  chown quagga:quagga /etc/quagga/bgpd.conf
-
-  cat <<EOF > /etc/quagga/zebra.conf
+    cat <<EOF > /etc/quagga/zebra.conf
 hostname $HOSTNAME
 password $QUAGGA_PASSWORD
 enable password $QUAGGA_PASSWORD
@@ -210,53 +74,20 @@ EOF
 
   chmod 640 /etc/quagga/zebra.conf
   chown quagga:quagga /etc/quagga/zebra.conf
-}
 
-setup_network() {
-  #Create a network namespace
-  ip netns add openswan
+    cat <<EOF > /etc/quagga/bgpd.conf
+hostname $HOSTNAME
+password $QUAGGA_PASSWORD
+enable password $QUAGGA_PASSWORD
+!
+log file /var/log/quagga/bgpd.log
+debug bgp events
+debug bgp zebra
+debug bgp updates
+!
+line vty
+EOF
 
-  #Create interfaces and assign IP
-  ip link add type veth
-  ip link set dev veth1 netns openswan
-  ip link set dev veth0 name toopenswan
-  ip addr add dev toopenswan $GATEWAY_IP/28
-  $ox ip link set dev veth1 name eth0
-  $ox ip addr add dev eth0 $NAMESPACE_TUNNEL1_IP/28
-  $ox ip addr add dev eth0 $NAMESPACE_TUNNEL2_IP/28
-  $ox ip addr add dev eth0 $CGW_TUNNEL1_INSIDE_IP/30
-  $ox ip addr add dev eth0 $CGW_TUNNEL2_INSIDE_IP/30
-  ip link set toopenswan up
-  $ox ip link set eth0 up
-  $ox ip link set lo up
-
-  #Configure routing
-  iptables -t nat -D PREROUTING -s $VGW_TUNNEL1_OUTSIDE_IP/32 -i eth0 -j DNAT --to-destination $NAMESPACE_TUNNEL1_IP
-  iptables -t nat -A PREROUTING -s $VGW_TUNNEL1_OUTSIDE_IP/32 -i eth0 -j DNAT --to-destination $NAMESPACE_TUNNEL1_IP
-  iptables -t nat -D POSTROUTING -d $VGW_TUNNEL1_OUTSIDE_IP/32 -j SNAT --to-source $INSTANCE_IP
-  iptables -t nat -A POSTROUTING -d $VGW_TUNNEL1_OUTSIDE_IP/32 -j SNAT --to-source $INSTANCE_IP 
-
-  iptables -t nat -D PREROUTING -s $VGW_TUNNEL2_OUTSIDE_IP/32 -i eth0 -j DNAT --to-destination $NAMESPACE_TUNNEL2_IP
-  iptables -t nat -A PREROUTING -s $VGW_TUNNEL2_OUTSIDE_IP/32 -i eth0 -j DNAT --to-destination $NAMESPACE_TUNNEL2_IP
-  iptables -t nat -D POSTROUTING -d $VGW_TUNNEL2_OUTSIDE_IP/32 -j SNAT --to-source $INSTANCE_IP
-  iptables -t nat -A POSTROUTING -d $VGW_TUNNEL2_OUTSIDE_IP/32 -j SNAT --to-source $INSTANCE_IP 
-
-  $ox ip r add default via $GATEWAY_IP
-  sysctl -w net.ipv4.conf.all.forwarding=1
-}
-
-teardown_network() {
-	ip link delete toopenswan type veth
-  ip link delete veth0 type veth
-  ip link delete veth1 type veth
-  ip netns delete openswan
-
-  iptables -t nat -D PREROUTING -s $VGW_TUNNEL1_OUTSIDE_IP/32 -i eth0 -j DNAT --to-destination $NAMESPACE_TUNNEL1_IP
-  iptables -t nat -D POSTROUTING -d $VGW_TUNNEL1_OUTSIDE_IP/32 -j SNAT --to-source $INSTANCE_IP
-  iptables -t nat -D PREROUTING -s $VGW_TUNNEL2_OUTSIDE_IP/32 -i eth0 -j DNAT --to-destination $NAMESPACE_TUNNEL2_IP
-  iptables -t nat -D POSTROUTING -d $VGW_TUNNEL2_OUTSIDE_IP/32 -j SNAT --to-source $INSTANCE_IP
-
-  sysctl -w net.ipv4.conf.all.forwarding=0
 }
 
 start_control_plane() {
@@ -283,8 +114,6 @@ delete_files() {
 start() {
     (
     setup_environment
-    create_files
-    setup_network
     start_control_plane
     RETVAL=$? 
     ) 2>&1 | $logger
