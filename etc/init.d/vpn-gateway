@@ -84,10 +84,34 @@ log file /var/log/quagga/bgpd.log
 debug bgp events
 debug bgp zebra
 debug bgp updates
+include "/etc/quagga/peers.d/*.conf"
 !
 line vty
 EOF
 
+  chmod 640 /etc/quagga/bgpd.conf
+  chown quagga:quagga /etc/quagga/bgpd.conf
+  mkdir -p /etc/quagga/peers.d/
+
+  cat <<EOF > /etc/ipsec.conf
+# /etc/ipsec.conf - Openswan IPsec configuration file
+#
+# Manual:     ipsec.conf.5
+#
+# Please place your own config files in /etc/ipsec.d/ ending in .conf
+
+version 2.0     # conforms to second version of ipsec.conf specification
+
+# basic configuration
+config setup
+        protostack=netkey
+        nat_traversal=no
+        virtual_private=
+        oe=off
+
+include /etc/ipsec.d/*.conf
+EOF
+chmod 600 /etc/ipsec.conf
 }
 
 start_control_plane() {
