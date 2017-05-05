@@ -96,6 +96,13 @@ Parameters:
   EmailAddress:
     Description: Email Address for SNS Topic. Alarms for Vault instance memory utilization
     Type: String
+  S3ConfBucket:
+    Description: S3 Bucket where the vpn-gateway is stored
+    Type: String
+  S3ConfPath:
+    Description: Location of the within the S3 bucket where the vpn-gateway is stored
+    Type: String
+
 Mappings:
   AWSRegionAMI:
     us-east-1:
@@ -430,6 +437,16 @@ Resources:
              - "yum update -y aws-cfn-bootstrap \n"
              - "yum install -y openswan quagga \n"
              - "yum erase ipsec-tools \n"
+             - "mkdir -p /tmp/setup \n"
+             - Fn::Join:
+                - ''
+                - - "aws s3 cp s3://"
+                  - Ref: S3ConfBucket
+                  - "/"
+                  - Ref: S3ConfPath
+                  - " "
+                  - "/tmp/setup\n"
+
   CSRInstanceAssocEIP1:
     Type: AWS::EC2::EIPAssociation
     Properties:
@@ -437,24 +454,14 @@ Resources:
         Ref: CSRInstance1
       EIP:
         Ref: CSRInstanceEIP1
-
-MySNSTopic:
-  Type: "AWS::SNS::Topic"
-  Properties:
-    Subscription:
-      -
-        Endpoint:
-          Fn::GetAtt:
-            - "MyQueue1"
-            - "Arn"
-        Protocol: "sqs"
-      -
-        Endpoint:
-          Fn::GetAtt:
-            - "MyQueue2"
-            - "Arn"
-        Protocol: "sqs"
-    TopicName: "SampleTopic"
+  RebootSNSTopic:
+    Type: "AWS::SNS::Topic"
+    Properties:
+      Subscription:
+        -
+          Endpoint:
+            Ref: EmailAddress
+          Protocol: email
   CSRRecoveryAlarm1:
     Type: AWS::CloudWatch::Alarm
     Properties:
